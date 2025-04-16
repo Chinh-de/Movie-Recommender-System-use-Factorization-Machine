@@ -1,0 +1,6 @@
+flask
+numpy
+pandas
+scikit-learn
+torch
+pytorch_lightning 

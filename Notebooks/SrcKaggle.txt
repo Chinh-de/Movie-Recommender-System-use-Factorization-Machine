@@ -1,0 +1,6 @@
+notebooks: https://www.kaggle.com/code/chinhde/factorization-machine-recommender-system
+dataset: https://www.kaggle.com/datasets/chinhde/imdb-dataset
+
+use OUTPUT notebooks:
+Add movies.csv and ratings.csv to data
+Add factorization_machine.pt, support_data.pkl, FactorizationMachine.py to Model

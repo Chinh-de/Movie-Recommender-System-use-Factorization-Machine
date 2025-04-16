@@ -1,0 +1,5 @@
+# Bỏ qua thư mục môi trường ảo
+venv/
+
+# Bỏ qua dữ liệu
+data/
