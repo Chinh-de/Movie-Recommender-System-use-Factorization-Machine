@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Movie Recommendations</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow">
+            <div class="container">
+              <a class="navbar-brand fw-bold" href="/">🍿 Movie Recommender System</a>
+            </div>
+        </nav>
+        <a href="/predict" class="btn btn-link mb-3">→ Predict Rating</a>
+
+        <h1 class="mb-4">View User Ratings and Movie Recommendations</h1>
+        
+        <form method="POST" class="card p-4 shadow-sm mb-4">
+            <div class="mb-3">
+                <label for="user_id" class="form-label">Select User ID:</label>
+                <select name="user_id" id="user_id" class="form-select">
+                    {% for user_id in usernames %}
+                    <option value="{{ user_id }}">{{ user_id }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+
+        {% if recommended_movies %}
+        <div class="mb-5">
+            <h2 class="mb-3">Recommended Movies</h2>
+            <div class="row row-cols-1 row-cols-md-5 g-3">
+                {% for movie in recommended_movies %}
+                <div class="col">
+                    <div class="card h-100 text-center">
+                        <img src="{{ movie['image'] }}" class="card-img-top" alt="{{ movie['title'] }}" style="object-fit: contain; height: 200px;">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ movie['title'] }}</h5>
+                            <div class="mb-2">
+                                <span class="badge bg-secondary">{{ movie['year'] }}</span>
+                                <br>
+                                <span class="badge bg-info">
+                                    {{ movie['genres'][:30] ~ ('...' if movie['genres']|length > 30 else '') }}
+                                </span>                            </div>
+                            <p>Average Rating: {{ movie['rating'] }} ⭐ ({{ movie['numrate'] }} votes)</p>
+                            <p>Predicted Rating: {{ movie['predicted_rating'] }} ⭐</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if user_ratings is not none and not user_ratings.empty %}
+        <div class="mb-5">
+            <h2 class="mb-3">Rating History</h2>
+            <table class="table table-bordered table-striped">
+                <thead class="table-light">
+                    <tr>
+                        <th>Title</th>
+                        <th>Rating</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rating in user_ratings.itertuples() %}
+                    <tr>
+                        <td>{{ rating.MovieID }}</td>
+                        <td>{{ rating.Rating }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
