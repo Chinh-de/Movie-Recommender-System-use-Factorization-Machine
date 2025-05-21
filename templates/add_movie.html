@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thêm phim mới</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">🍿 Movie Recommender System</a>
+        </div>
+    </nav>
+    <h2 class="mb-4">Thêm phim mới</h2>
+    {% if message %}
+        <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+    <form method="POST" class="card p-4 shadow-sm mb-4">
+        <div class="row g-3">
+            {% for key, label in {'ID':'ID', 'Title':'Tên phim', 'Year':'Năm', 'Genres':'Thể loại', 'Image':'Ảnh', 'Numrate':'Số lượt đánh giá', 'Rating':'Điểm TB', 'Directors':'Đạo diễn', 'Writers':'Biên kịch', 'Stars':'Diễn viên', 'Runtime':'Thời lượng'}.items() %}
+            <div class="col-md-6">
+                <label class="form-label">{{ label }}</label>
+                <input type="text" class="form-control" name="{{ key }}" value="{{ movie_info[key] }}">
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-success mt-4">Thêm phim</button>
+    </form>
+
+    {% if predicted_users %}
+    <h4 class="mt-4">Top người dùng dự đoán sẽ cho điểm cao</h4>
+    <table class="table table-bordered table-striped">
+        <thead class="table-light">
+            <tr>
+                <th>Username</th>
+                <th>Predicted Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for username, score in predicted_users %}
+            <tr>
+                <td>{{ username }}</td>
+                <td>{{ '%.2f'|format(score) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+</body>
+</html>
