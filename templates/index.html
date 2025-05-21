@@ -1,36 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Movie Recommendations</title>
+    <title>Gợi ý Phim</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .autocomplete-container {
+            position: relative;
+        }
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #d4d4d4;
+        }
+        .autocomplete-items div:hover {
+            background-color: #e9e9e9;
+        }
+        .autocomplete-active {
+            background-color: #0d6efd !important;
+            color: #ffffff;
+        }
+    </style>
 </head>
 <body class="bg-light">
     <div class="container py-4">
         <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow">
             <div class="container">
-              <a class="navbar-brand fw-bold" href="/">🍿 Movie Recommender System</a>
+              <a class="navbar-brand fw-bold" href="/">🍿 Hệ thống Gợi ý Phim</a>
             </div>
         </nav>
-        <a href="/predict" class="btn btn-link mb-3">→ Predict Rating</a>
+        <a href="/predict" class="btn btn-link mb-3">→ Dự đoán Đánh giá</a>
 
-        <h1 class="mb-4">View User Ratings and Movie Recommendations</h1>
+        <h1 class="mb-4">Xem Đánh giá của Người dùng và Gợi ý Phim</h1>
         
-        <form method="POST" class="card p-4 shadow-sm mb-4">
-            <div class="mb-3">
-                <label for="user_id" class="form-label">Select User ID:</label>
-                <select name="user_id" id="user_id" class="form-select">
-                    {% for user_id in usernames %}
-                    <option value="{{ user_id }}">{{ user_id }}</option>
-                    {% endfor %}
-                </select>
+        <form method="POST" class="card p-4 shadow-sm mb-4" id="userForm">
+            <div class="mb-3 autocomplete-container">
+                <label for="user_id_input" class="form-label">Nhập User ID:</label>
+                <input type="text" id="user_id_input" class="form-control" placeholder="Nhập ít nhất 2 ký tự để tìm kiếm..." autocomplete="off">
+                <input type="hidden" name="user_id" id="user_id">
+                <div id="autocomplete-list" class="autocomplete-items"></div>
             </div>
-            <button type="submit" class="btn btn-primary">Submit</button>
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>Gửi</button>
         </form>
+
+        <div id="loading" class="text-center d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p>Đang tải gợi ý phim...</p>
+        </div>
 
         {% if recommended_movies %}
         <div class="mb-5">
-            <h2 class="mb-3">Recommended Movies</h2>
+            <h2 class="mb-3">Gợi ý cho <span class="text-primary">"{{ request.form.user_id if request.form.user_id else '' }}"</span></h2>
             <div class="row row-cols-1 row-cols-md-5 g-3">
                 {% for movie in recommended_movies %}
                 <div class="col">
@@ -43,9 +78,10 @@
                                 <br>
                                 <span class="badge bg-info">
                                     {{ movie['genres'][:30] ~ ('...' if movie['genres']|length > 30 else '') }}
-                                </span>                            </div>
-                            <p>Average Rating: {{ movie['rating'] }} ⭐ ({{ movie['numrate'] }} votes)</p>
-                            <p>Predicted Rating: {{ movie['predicted_rating'] }} ⭐</p>
+                                </span>                            
+                            </div>
+                            <p>Đánh giá trung bình: {{ movie['rating'] }} ⭐ ({{ movie['numrate'] }} lượt)</p>
+                            <p>Đánh giá dự đoán: {{ movie['predicted_rating'] }} ⭐</p>
                         </div>
                     </div>
                 </div>
@@ -56,18 +92,18 @@
 
         {% if user_ratings is not none and not user_ratings.empty %}
         <div class="mb-5">
-            <h2 class="mb-3">Rating History</h2>
+            <h2 class="mb-3">Lịch sử Đánh giá</h2>
             <table class="table table-bordered table-striped">
                 <thead class="table-light">
                     <tr>
-                        <th>Title</th>
-                        <th>Rating</th>
+                        <th>Tiêu đề</th>
+                        <th>Đánh giá</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for rating in user_ratings.itertuples() %}
                     <tr>
-                        <td>{{ rating.MovieID }}</td>
+                        <td>{{ movies_df[movies_df['ID'] == rating.MovieID]['Title'].values[0] if not movies_df[movies_df['ID'] == rating.MovieID].empty else rating.MovieID }}</td>
                         <td>{{ rating.Rating }}</td>
                     </tr>
                     {% endfor %}
@@ -76,5 +112,127 @@
         </div>
         {% endif %}
     </div>
+
+    <script>
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const userInput = document.getElementById('user_id_input');
+            const userIdField = document.getElementById('user_id');
+            const autoCompleteList = document.getElementById('autocomplete-list');
+            const submitBtn = document.getElementById('submitBtn');
+            const form = document.getElementById('userForm');
+            const loadingIndicator = document.getElementById('loading');
+            
+            let debounceTimer;
+            
+            userInput.addEventListener('input', function() {
+                clearTimeout(debounceTimer);
+                
+                // Xóa giá trị user_id và vô hiệu hóa nút Submit khi input thay đổi
+                userIdField.value = '';
+                submitBtn.disabled = true;
+                
+                // Tạo độ trễ 300ms trước khi gửi yêu cầu tìm kiếm
+                debounceTimer = setTimeout(() => {
+                    const query = userInput.value.trim();
+                    
+                    if (query.length < 2) {
+                        autoCompleteList.innerHTML = '';
+                        return;
+                    }
+                    
+                    // Trong một ứng dụng thực tế, bạn sẽ gọi API ở đây
+                    fetchUsers(query);
+                }, 300);
+            });
+            
+            form.addEventListener('submit', function(e) {
+                loadingIndicator.classList.remove('d-none');
+            });
+            
+            function fetchUsers(query) {
+                // Trong ứng dụng thực tế, đây sẽ là một yêu cầu fetch API
+                fetch(`/api/search_users?query=${encodeURIComponent(query)}`)
+                   .then(response => response.json())
+                   .then(data => showSuggestions(data))
+                   .catch(error => {
+                       console.error('Error fetching users:', error);
+                       // Fallback đến mô phỏng nếu API thất bại
+                       simulateApiResponse(query);
+                   });
+            }
+            
+            function simulateApiResponse(query) {
+                // Đây chỉ là mô phỏng - sẽ được sử dụng nếu API thất bại
+                setTimeout(() => {
+                    // Giả lập một số người dùng mẫu với thông tin chi tiết
+                    const sampleUsers = [
+                        { username: 'user1', gender: 'Male', age: 25, occupation: 'Engineer' },
+                        { username: 'user2', gender: 'Female', age: 30, occupation: 'Teacher' },
+                        { username: 'user3', gender: 'Male', age: 45, occupation: 'Doctor' },
+                        { username: 'user4', gender: 'Female', age: 28, occupation: 'Artist' },
+                        { username: 'user5', gender: 'Male', age: 35, occupation: 'Developer' }
+                    ];
+                    
+                    const filteredUsers = sampleUsers.filter(user => 
+                        user.username.toLowerCase().includes(query.toLowerCase())
+                    );
+                    
+                    showSuggestions(filteredUsers);
+                }, 200);
+            }
+            
+            function showSuggestions(users) {
+                autoCompleteList.innerHTML = '';
+                
+                if (users.length === 0) {
+                    const div = document.createElement('div');
+                    div.innerHTML = 'Không tìm thấy người dùng nào';
+                    autoCompleteList.appendChild(div);
+                    return;
+                }
+                
+                users.forEach(user => {
+                    const div = document.createElement('div');
+                    
+                    // Kiểm tra xem user là chuỗi đơn giản hay object với thông tin chi tiết
+                    if (typeof user === 'string') {
+                        div.innerHTML = `<strong>${user}</strong>`;
+                        div.addEventListener('click', function() {
+                            userInput.value = user;
+                            userIdField.value = user;
+                            autoCompleteList.innerHTML = '';
+                            submitBtn.disabled = false;
+                        });
+                    } else {
+                        // Hiển thị thông tin chi tiết của người dùng
+                        div.innerHTML = `
+                            <div>
+                                <strong>${user.username}</strong>
+                                <div class="small text-muted">
+                                    ${user.gender}, ${user.age} tuổi, ${user.occupation}
+                                </div>
+                            </div>
+                        `;
+                        div.addEventListener('click', function() {
+                            userInput.value = user.username;
+                            userIdField.value = user.username;
+                            autoCompleteList.innerHTML = '';
+                            submitBtn.disabled = false;
+                        });
+                    }
+                    
+                    autoCompleteList.appendChild(div);
+                });
+            }
+            
+            // Đóng danh sách gợi ý khi click ra ngoài
+            document.addEventListener('click', function(e) {
+                if (e.target !== userInput) {
+                    autoCompleteList.innerHTML = '';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
