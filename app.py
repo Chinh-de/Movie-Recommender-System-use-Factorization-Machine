@@ -41,7 +41,7 @@ app = Flask(__name__)
 def index():
     user_ratings = None
     recommended_movies = []
-    usernames = ratings_df['Username'].unique()
+    usernames = ratings_df['Username'].head(1000).unique()
 
     if request.method == 'POST':
         # Updated to match form field name in the HTML template
