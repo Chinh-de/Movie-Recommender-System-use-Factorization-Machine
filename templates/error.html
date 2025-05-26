@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Error</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8d7da;
+            color: #721c24;
+            text-align: center;
+            padding-top: 100px;
+        }
+        .container {
+            background: #fff;
+            border: 1px solid #f5c6cb;
+            display: inline-block;
+            padding: 40px 60px;
+            border-radius: 8px;
+        }
+        .btn-back {
+            margin-top: 20px;
+            padding: 10px 25px;
+            background: #721c24;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 16px;
+        }
+        .btn-back:hover {
+            background: #a94442;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Đã xảy ra lỗi!</h1>
+        <p>Xin lỗi, đã có lỗi xảy ra trong quá trình xử lý.</p>
+        <p><strong>Chi tiết lỗi:</strong> {{ error }}</p>
+        <a href="javascript:history.back()" class="btn-back">Quay về</a>
+    </div>
+</body>
+</html>

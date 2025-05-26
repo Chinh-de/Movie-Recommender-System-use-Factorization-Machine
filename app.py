@@ -1,11 +1,13 @@
 import torch
 import pickle
 import pandas as pd
-from flask import Flask, render_template, request, jsonify
-from New_Model.FactorizationMachine import FactorizationMachine
-
+import requests
+from flask import Flask, render_template, request, jsonify, url_for
+from Model.FactorizationMachine import FactorizationMachine
+import time
+import requests
 # Load supporting data
-with open("New_Model/support_data.pkl", "rb") as f:
+with open("Model/support_data.pkl", "rb") as f:
     data = pickle.load(f)
 
 # Model parameters
@@ -15,10 +17,38 @@ learning_rate = data["learning_rate"]
 weight_decay = data["weight_decay"]
 dropout_rate = data["dropout_rate"]
 
-movie_features = data["movie_features"]
-user_index_by_username = data["user_index_by_username"]
-movie_index_by_id = data["movie_index_by_id"]
-movie_id_by_index = {v: k for k, v in movie_index_by_id.items()}
+movie_features_list = data["movie_features"]
+user_features_list = data["user_features"]
+
+user_data = {
+    "user_index_by_username": data["user_index_by_username"],
+    "gender_index_by_name": data["gender_index_by_name"],
+    "age_index_by_name": data["age_index_by_name"],
+    "occupation_index_by_name": data["occupation_index_by_name"],
+    "gender_offset": data["gender_offset"],
+    "age_offset": data["age_offset"],
+    "occupation_offset": data["occupation_offset"],
+}
+
+movie_data = {
+    "movie_index_by_id": data["movie_index_by_id"],
+    "genre_index_by_name": data["genre_index_by_name"],
+    "year_index_by_group": data["year_index_by_group"],
+    "runtime_index_by_group": data["runtime_index_by_group"],
+    "director_index_by_name": data["director_index_by_name"],
+    "writer_index_by_name": data["writer_index_by_name"],
+    "star_index_by_name": data["star_index_by_name"],
+    "movie_offset": data["movie_offset"],
+    "genre_offset": data["genre_offset"],
+    "year_offset": data["year_offset"],
+    "runtime_offset": data["runtime_offset"],
+    "director_offset": data["director_offset"],
+    "writer_offset": data["writer_offset"],
+    "star_offset": data["star_offset"],
+}
+
+movie_id_by_index = {v: k for k, v in movie_data["movie_index_by_id"].items()}
+username_by_index = {v: k for k, v in user_data["user_index_by_username"].items()}
 
 # Load trained model
 model = FactorizationMachine(
@@ -28,7 +58,7 @@ model = FactorizationMachine(
     weight_decay=weight_decay,
     dropout_rate=dropout_rate
 )
-model.load_state_dict(torch.load("New_Model/factorization_machine.pt", map_location="cpu"))
+model.load_state_dict(torch.load("Model/factorization_machine.pt", map_location="cpu"))
 model.eval()
 
 # Load data for ratings and movies
@@ -42,59 +72,65 @@ app = Flask(__name__)
 def index():
     user_ratings = None
     recommended_movies = []
-    usernames = ratings_df['Username'].head(1000).unique()
+    usernames = users_df['Username']
 
     if request.method == 'POST':
         # Updated to match form field name in the HTML template
         username = request.form['user_id']
-        user_ratings = ratings_df[ratings_df['Username'] == username]
+        mask = ratings_df['Username'].eq(username)
+        user_ratings = ratings_df.loc[mask]
 
-        if not user_ratings.empty:
-            # Get the list of movie IDs that the user has already rated
+        if user_ratings.empty:
+            movie_idx_set = set()  # No ratings, so no exclusions
+        else:    
             movie_ids_set = set(user_ratings['MovieID'])
-            movie_idx_set = {movie_index_by_id.get(movie_id, 0) for movie_id in movie_ids_set}
+            movie_idx_set = {movie_data['movie_index_by_id'].get(movie_id, 0) for movie_id in movie_ids_set}
 
-            # Get top-k movie recommendations
-            recommendations = model.recommend_top_k(
-                username,
-                movie_features,
-                user_features=data["user_features"],
-                user_index_by_username=user_index_by_username,
-                k=15,
-                exclude_movie_indices=movie_idx_set
-            )
+        # Get top-k movie recommendations
+        recommendations = model.recommend_top_k(
+            username=username,
+            movie_features=movie_features_list,
+            user_features=user_features_list,
+            user_index_by_username=user_data["user_index_by_username"],
+            k=15,
+            exclude_movie_indices=movie_idx_set
+        )
+        print(f"Recommendations for user '{username}': {recommendations}")
 
-            # Prepare recommended movies
-            for i, (movie_idx, rating) in enumerate(recommendations, 1):
-                movie_id = movie_id_by_index.get(movie_idx, "Unknown Movie ID")
-                movie_row = movies_df[movies_df['ID'] == movie_id]
+        # Prepare recommended movies
+        for i, (movie_idx, rating) in enumerate(recommendations, 1):
+            movie_id = movie_id_by_index.get(movie_idx, "Unknown Movie ID")
+            movie_row = movies_df[movies_df['ID'] == movie_id]
 
-                if not movie_row.empty:
-                    movie_title = movie_row['Title'].values[0]
-                    movie_rating = movie_row['Rating'].values[0]
-                    movie_image = movie_row['Image'].values[0] if 'Image' in movie_row.columns else 'default_image_url.jpg'
-                    # Add the new fields
-                    movie_year = movie_row['Year'].values[0] if 'Year' in movie_row.columns else 'Unknown'
-                    movie_numrate = movie_row['Numrate'].values[0] if 'Numrate' in movie_row.columns else 'Unknown'
-                    movie_genres = movie_row['Genres'].values[0] if 'Genres' in movie_row.columns else 'Unknown'
-                else:
-                    movie_title = "Unknown Movie Title"
-                    movie_rating = "Unknown Rating"
-                    movie_image = 'default_image_url.jpg'
-                    movie_year = 'Unknown'
-                    movie_numrate = 'Unknown'
-                    movie_genres = 'Unknown'
+            if not movie_row.empty:
+                movie_id = movie_row['ID'].values[0]
+                movie_title = movie_row['Title'].values[0]
+                movie_rating = movie_row['Rating'].values[0]
+                movie_image = movie_row['Image'].values[0] if 'Image' in movie_row.columns else 'default_image_url.jpg'
+                # Add the new fields
+                movie_year = movie_row['Year'].values[0] if 'Year' in movie_row.columns else 'Unknown'
+                movie_numrate = movie_row['Numrate'].values[0] if 'Numrate' in movie_row.columns else 'Unknown'
+                movie_genres = movie_row['Genres'].values[0] if 'Genres' in movie_row.columns else 'Unknown'
+            else:
+                movie_id = "#"
+                movie_title = "Unknown Movie Title"
+                movie_rating = "Unknown Rating"
+                movie_image = 'default_image_url.jpg'
+                movie_year = 'Unknown'
+                movie_numrate = 'Unknown'
+                movie_genres = 'Unknown'
 
-                recommended_movies.append({
-                    'title': movie_title,
-                    'rating': movie_rating,
-                    'movie_id': movie_id,
-                    'predicted_rating': f"{rating:.2f}",
-                    'image': movie_image,
-                    'year': movie_year,
-                    'numrate': movie_numrate,
-                    'genres': movie_genres
-                })
+            recommended_movies.append({
+                'ID': movie_id,
+                'title': movie_title,
+                'rating': movie_rating,
+                'movie_id': movie_id,
+                'predicted_rating': f"{rating:.2f}",
+                'image': movie_image,
+                'year': movie_year,
+                'numrate': movie_numrate,
+                'genres': movie_genres
+            })
 
     return render_template(
         'index.html',
@@ -130,17 +166,18 @@ def predict():
         selected_username = request.form['user_id']
         selected_movie_id = request.form['movie_id']
 
-        user_index = user_index_by_username.get(selected_username, -1)
-        movie_index = movie_index_by_id.get(selected_movie_id, -1)
+        user_index = user_data['user_index_by_username'].get(selected_username, -1)
+        movie_index = movie_data['movie_index_by_id'].get(selected_movie_id, -1)
 
         if user_index != -1 and movie_index != -1:
             with torch.no_grad():
                 predicted_rating_value = model.predict_rating(
                     username=selected_username,
                     movie_id=selected_movie_id,
-                    user_index_by_username=user_index_by_username,
-                    movie_index_by_id=movie_index_by_id,
-                    movie_features=movie_features
+                    user_index_by_username=user_data['user_index_by_username'],
+                    movie_index_by_id=movie_data['movie_index_by_id'],
+                    movie_features=movie_features_list,
+                    user_features=user_features_list,
                 )
                 predicted_rating = f"{predicted_rating_value:.2f}"
 
@@ -177,10 +214,14 @@ def predict():
         movies_df=movies_list
     )
 
+
 @app.route('/new_user_recommend', methods=['GET', 'POST'])
 def new_user_recommend():
+    global user_data, movie_data, model, movie_features_list, user_features_list, movies_df, users_df, movie_id_by_index, username_by_index
+
     recommended_movies = []
     user_info = {'username': '', 'gender': '', 'age': '', 'occupation': ''}
+    
     show_result = False
 
     # Các lựa chọn cho form
@@ -202,30 +243,41 @@ def new_user_recommend():
         user_info['occupation'] = int(request.form.get('occupation', 0))
         show_result = True
 
-        # Tạo user_index_by_username tạm thời
-        temp_user_index = 0
-        gender_index_by_name = {"Female":0, "Male": 1}
-        age_index_by_name = {1: 0, 18: 1, 25: 2, 35:3, 45: 4, 50: 5, 56:6}
-        occupation_index_by_name = {i: i for i in range(21)}
-        num_users = 1
-        gender_offset = num_users
-        age_offset = gender_offset + len(gender_index_by_name)
-        occupation_offset = age_offset + len(age_index_by_name)
+        if user_info['username'] in user_data['user_index_by_username'].keys():
+            return render_template('error.html', error="Username đã tồn tại.")
+        print(user_info)
+
+        idx = len(user_data['user_index_by_username'])
+        user_data['user_index_by_username'][user_info['username']] = idx
+        username_by_index[idx] = user_info['username']
 
         # Tạo user_features cho user mới
-        gender_index = gender_index_by_name[user_info['gender']] + gender_offset
-        age_index = age_index_by_name[user_info['age']] + age_offset
-        occupation_index = occupation_index_by_name[user_info['occupation']] + occupation_offset
-        new_user_features = [temp_user_index, gender_index, age_index, occupation_index]
+        gender_index = user_data['gender_index_by_name'][user_info['gender']] + user_data['gender_offset']
+        age_index = user_data['age_index_by_name'][user_info['age']] + user_data['age_offset']
+        occupation_index = user_data['occupation_index_by_name'][user_info['occupation']] + user_data['occupation_offset']
+        new_user_features = [num_inputs, gender_index, age_index, occupation_index]
+        # num_inputs là padding 
+        user_features_list.append(new_user_features)
+        
+        new_row = pd.DataFrame([{
+            'Username': user_info['username'],
+            'Gender': user_info['gender'],
+            'Age': user_info['age'],
+            'Occupation': user_info['occupation']
+        }])
+
+        # Nối vào users_df
+        users_df = pd.concat([users_df, new_row], ignore_index=True)
+
 
         # Gợi ý phim cho user mới
         recommendations = model.recommend_top_k(
             user_info['username'],
-            movie_features,
-            [new_user_features],  # user_features chỉ có 1 user
-            {user_info['username']: 0},
+            movie_features_list,
+            user_features_list, 
+            {user_info['username']: idx},  # user_index_by_username chỉ có 1 user
             exclude_movie_indices=set(),
-            k=10
+            k=15
         )
         for i, (movie_idx, rating) in enumerate(recommendations, 1):
             movie_id = movie_id_by_index.get(movie_idx, "Unknown Movie ID")
@@ -245,6 +297,7 @@ def new_user_recommend():
                 movie_numrate = 'Unknown'
                 movie_genres = 'Unknown'
             recommended_movies.append({
+                'ID': movie_id,
                 'title': movie_title,
                 'rating': movie_rating,
                 'movie_id': movie_id,
@@ -291,155 +344,303 @@ def search_users():
     
     return jsonify(results)
 
+@app.route('/api/search_movies')
+def search_movies():
+    query = request.args.get('query', '').lower()
+    
+    if not query or len(query) < 2:
+        return jsonify([])
+
+    # Tìm các phim có tiêu đề chứa query
+    filtered_movies = movies_df[movies_df['Title'].str.lower().str.contains(query)]
+
+    # Giới hạn kết quả (tối đa 20 phim)
+    filtered_movies = filtered_movies.head(20)
+
+    # Chuyển đổi thành danh sách các dictionary
+    results = []
+    for _, row in filtered_movies.iterrows():
+        results.append({
+            'id': row['ID'],
+            'title': row['Title'],
+            'year': int(row['Year']),
+            'genres': row['Genres'],
+            'image': row['Image'],
+            'numrate': row['Numrate'],
+            'rating': row['Rating']
+        })
+
+    return jsonify(results)
+
+
+
+@app.route('/movies')
+def movies_index():
+    query = request.args.get('q', '').strip()
+    
+    # Lọc phim theo query nếu có
+    if query:
+        filtered_movies = movies_df[movies_df['Title'].str.contains(query, case=False, na=False)]
+    else:
+        filtered_movies = movies_df
+
+    # Lấy 40 phim đầu tiên
+    movies = filtered_movies.head(40).to_dict('records')
+
+    return render_template(
+        'movies.html',
+        movies=movies,
+        query=query
+    )
+
+def group_years(year):
+    return (year // 5) * 5
+
+def group_runtime(runtime):
+    if runtime < 60:
+        return 'Very_Short'
+    elif runtime < 90:
+        return 'Short'
+    elif runtime < 120:
+        return 'Standard'
+    elif runtime < 150:
+        return 'Long'
+    else:
+        return 'Very_Long'
+
+@app.route('/api/search_movie_fields')
+def search_movie_fields():
+    field = request.args.get('field', '')
+    query = request.args.get('query', '').lower()
+    
+    if not query or len(query) < 2:
+        return jsonify([])
+        
+    results = []
+    if field == 'genres':
+        terms = [name for name in movie_data['genre_index_by_name'].keys() if query in name.lower()]
+        results = [{'name': term} for term in terms]
+    elif field == 'directors':
+        terms = [name for name in movie_data['director_index_by_name'].keys() if query in name.lower()]
+        results = [{'name': term} for term in terms]
+    elif field == 'writers':
+        terms = [name for name in movie_data['writer_index_by_name'].keys() if query in name.lower()]
+        results = [{'name': term} for term in terms]
+    elif field == 'stars':
+        terms = [name for name in movie_data['star_index_by_name'].keys() if query in name.lower()]
+        results = [{'name': term} for term in terms]
+    
+    return jsonify(results[:20])
+
 @app.route('/add_movie', methods=['GET', 'POST'])
 def add_movie():
+    global movie_features_list, user_features_list, movies_df, ratings_df, movie_data, user_data, model, movie_id_by_index, username_by_index
     message = None
     predicted_users = []
     movie_info = {
         'ID': '', 'Title': '', 'Year': '', 'Genres': '', 'Image': '', 'Numrate': '', 'Rating': '',
         'Directors': '', 'Writers': '', 'Stars': '', 'Runtime': ''
     }
+    
+    
     if request.method == 'POST':
-        # Lấy thông tin phim từ form
+        # Get movie info from form
         for key in movie_info.keys():
             movie_info[key] = request.form.get(key, '').strip()
-        # Thêm phim vào DataFrame và lưu file
-        new_row = pd.DataFrame([movie_info])
-        global movies_df
-        movies_df = pd.concat([movies_df, new_row], ignore_index=True)
-        movies_df.to_csv('data/movies.csv', index=False)
-        message = f"Đã thêm phim '{movie_info['Title']}' thành công!"
-
-        # Dự đoán điểm cho từng user
-        top_users = []
-        # --- Tạo movie_features cho phim mới từ dữ liệu nhập ---
-        def get_or_default(val, default):
-            return val if val else default
-
-        # Lấy offset và mapping từ data
-        genre_index_by_name = data.get('genre_index_by_name', {})
-        year_index_by_group = data.get('year_index_by_group', {})
-        runtime_index_by_group = data.get('runtime_index_by_group', {})
-        director_index_by_name = data.get('director_index_by_name', {})
-        writer_index_by_name = data.get('writer_index_by_name', {})
-        star_index_by_name = data.get('star_index_by_name', {})
-        occupation_offset = data.get('occupation_offset', 0)
-        movie_offset = data.get('movie_offset', 0)
-        genre_offset = data.get('genre_offset', 0)
-        year_offset = data.get('year_offset', 0)
-        runtime_offset = data.get('runtime_offset', 0)
-        director_offset = data.get('director_offset', 0)
-        writer_offset = data.get('writer_offset', 0)
-        star_offset = data.get('star_offset', 0)
-
-        # Tạo feature vector cho phim mới
-        new_movie_features = []
-        # Movie index mới
-        new_movie_index = len(movies_df) - 1
-        new_movie_features.append(movie_offset + new_movie_index)
-
-        # Genres
-        genres = [g.strip().lower() for g in movie_info['Genres'].split(',')] if movie_info['Genres'] else []
-        if not genres and len(movie_features) > 0:
-            # fallback
-            genres = [g for g in data.get('sample_genres', ['other'])]
-        for genre in genres:
-            idx = genre_index_by_name.get(genre)
-            if idx is not None:
-                new_movie_features.append(genre_offset + idx)
-
-        # Year group
+        
         try:
-            year = int(movie_info['Year'])
-            year_group = (year // 5) * 5
-        except:
-            year_group = None
-        if year_group in year_index_by_group:
-            new_movie_features.append(year_offset + year_index_by_group[year_group])
-        elif len(movie_features) > 0:
-            # fallback
-            sample = movie_features[0]
-            for f in sample:
-                if year_offset <= f < runtime_offset:
-                    new_movie_features.append(f)
-
-        # Runtime group
-        try:
-            runtime = int(movie_info['Runtime'])
-            if runtime < 60:
+            if movie_info['ID'] in movie_data['movie_index_by_id']:
+                message = "Phim đã tồn tại trong cơ sở dữ liệu."
+                return render_template('add_movie.html', message=message, movie_info=movie_info, predicted_users=predicted_users)            
+            # Convert string inputs to appropriate types and calculate groups
+            movie_info['Year'] = int(movie_info['Year'])
+            movie_info['Runtime'] = int(movie_info['Runtime'])
+            movie_info['Numrate'] = 0  # New movies start with 0 ratings
+            movie_info['Rating'] = 0.0  # New movies start with 0 rating
+            
+            # Calculate runtime group
+            if movie_info['Runtime'] < 60:
                 runtime_group = 'Very_Short'
-            elif runtime < 90:
+            elif movie_info['Runtime'] < 90:
                 runtime_group = 'Short'
-            elif runtime < 120:
+            elif movie_info['Runtime'] < 120:
                 runtime_group = 'Standard'
-            elif runtime < 150:
+            elif movie_info['Runtime'] < 150:
                 runtime_group = 'Long'
             else:
                 runtime_group = 'Very_Long'
-        except:
-            runtime_group = None
-        if runtime_group in runtime_index_by_group:
-            new_movie_features.append(runtime_offset + runtime_index_by_group[runtime_group])
-        elif len(movie_features) > 0:
-            sample = movie_features[0]
-            for f in sample:
-                if runtime_offset <= f < director_offset:
-                    new_movie_features.append(f)
+                
+            # Store calculated runtime group
+            movie_info['Runtime_group'] = runtime_group
+                       
+            
+            # Create movie features for the new movie
+            movie_features = [num_inputs]  # Start with padding
+            movie_index = len(movie_data['movie_index_by_id'])
+            movie_data['movie_index_by_id'][movie_info['ID']] = movie_index
+            movie_id_by_index[movie_index] = movie_info['ID']
 
-        # Directors
-        directors = [g.strip().lower() for g in movie_info['Directors'].split(',')] if movie_info['Directors'] else []
-        if not directors and len(movie_features) > 0:
-            directors = data.get('sample_directors', ['other'])
-        for director in directors:
-            idx = director_index_by_name.get(director)
-            if idx is not None:
-                new_movie_features.append(director_offset + idx)
 
-        # Writers
-        writers = [g.strip().lower() for g in movie_info['Writers'].split(',')] if movie_info['Writers'] else []
-        if not writers and len(movie_features) > 0:
-            writers = data.get('sample_writers', ['other'])
-        for writer in writers:
-            idx = writer_index_by_name.get(writer)
-            if idx is not None:
-                new_movie_features.append(writer_offset + idx)
+            # Add genres
+            if movie_info['Genres']:
+                for genre in movie_info['Genres'].split(', '):
+                    if genre in movie_data['genre_index_by_name']:
+                        idx = movie_data['genre_index_by_name'][genre]
+                        movie_features.append(movie_data['genre_offset'] + idx)
+                    
+            # Add year group
+            if movie_info['Year'] < 2000:
+                year_group = 2000
+            elif movie_info['Year'] > 2024:
+                year_group = 2000
+            else:
+                year_group = (movie_info['Year'] // 5) * 5
+            movie_info['Year_group'] = year_group
+            if year_group in movie_data['year_index_by_group']:
+                idx = movie_data['year_index_by_group'][year_group]
+                movie_features.append(movie_data['year_offset'] + idx)
+                  # Add runtime group - using calculated group
+            if runtime_group in movie_data['runtime_index_by_group']:
+                idx = movie_data['runtime_index_by_group'][runtime_group]
+                movie_features.append(movie_data['runtime_offset'] + idx)
+                
+            # Add directors
+            if movie_info['Directors']:
+                for director in movie_info['Directors'].split(', '):
+                    if director in movie_data['director_index_by_name']:
+                        idx = movie_data['director_index_by_name'][director]
+                        movie_features.append(movie_data['director_offset'] + idx)
+                    
+            # Add writers
+            if movie_info['Writers']:
+                for writer in movie_info['Writers'].split(', '):
+                    if writer in movie_data['writer_index_by_name']:
+                        idx = movie_data['writer_index_by_name'][writer]
+                        movie_features.append(movie_data['writer_offset'] + idx)
+                    
+            # Add stars
+            if movie_info['Stars']:
+                for star in movie_info['Stars'].split(', '):
+                    if star in movie_data['star_index_by_name']:
+                        idx = movie_data['star_index_by_name'][star]
+                        movie_features.append(movie_data['star_offset'] + idx)
 
-        # Stars
-        stars = [g.strip().lower() for g in movie_info['Stars'].split(',')] if movie_info['Stars'] else []
-        if not stars and len(movie_features) > 0:
-            stars = data.get('sample_stars', ['other'])
-        for star in stars:
-            idx = star_index_by_name.get(star)
-            if idx is not None:
-                new_movie_features.append(star_offset + idx)
 
-        # Nếu thiếu feature, fallback lấy sample_movie_features
-        if len(new_movie_features) < len(movie_features[0]):
-            sample_movie_features = movie_features[0].copy()
-            # Bổ sung cho đủ chiều dài
-            while len(new_movie_features) < len(sample_movie_features):
-                new_movie_features.append(sample_movie_features[len(new_movie_features)])
 
-        # --- Dự đoán điểm cho từng user ---
-        for username in ratings_df['Username'].unique():
-            user_index = user_index_by_username.get(username, None)
-            if user_index is None:
-                continue
-            user_features = data['user_features'][user_index]
-            with torch.no_grad():
-                features = user_features + new_movie_features
-                features_tensor = torch.tensor([features], dtype=torch.long)
-                pred = model(features_tensor)
-                pred_score = float(pred.item())
-            top_users.append((username, pred_score))
-        predicted_users = sorted(top_users, key=lambda x: x[1], reverse=True)[:10]
+            # Update global movie features list
+            movie_features_list.append(movie_features)            
 
+            new_row = pd.DataFrame([movie_info])
+            global movies_df
+            movies_df = pd.concat([movies_df, new_row], ignore_index=True)
+            message = f"Đã thêm phim '{movie_info['Title']}' thành công!"
+
+
+            # Predict ratings for all users
+            top_users = []
+            for username in ratings_df['Username'].unique():
+                user_index = user_data['user_index_by_username'].get(username)
+                if user_index is None:
+                    continue
+                    
+                with torch.no_grad():
+                    predicted_rating = model.predict_rating(
+                        username=username,
+                        movie_id=movie_info['ID'],
+                        user_index_by_username=user_data['user_index_by_username'],
+                        movie_index_by_id=movie_data['movie_index_by_id'],
+                        movie_features=movie_features_list,
+                        user_features=user_features_list
+                    )
+                    top_users.append((username, predicted_rating))
+                    
+            predicted_users = sorted(top_users, key=lambda x: x[1], reverse=True)[:10]
+            
+        except Exception as e:
+            message = f"Lỗi khi thêm phim: {str(e)}"
+            print(f"Error while adding movie: {e}")
+            
     return render_template(
         'add_movie.html',
         message=message,
         movie_info=movie_info,
-        predicted_users=predicted_users
+        predicted_users=predicted_users,
+
     )
+
+
+def process_array_field(field_value):
+    if isinstance(field_value, str):
+        # Remove brackets and quotes, then split by comma
+        clean_str = field_value.strip('[]').replace("'", "").strip()
+        return ', '.join(item.strip() for item in clean_str.split(','))
+    return field_value
+
+@app.route('/movie/<movieid>')
+def movie_detail(movieid):
+    try:
+        movie = movies_df[movies_df['ID'] == movieid].iloc[0].to_dict()
+
+        # Process array fields
+        array_fields = ['Directors', 'Writers', 'Stars', 'Genres']
+        for field in array_fields:
+            if field in movie:
+                movie[field] = process_array_field(movie[field])
+
+
+        similar_movies = movies_df.head(10).to_dict('records')
+        for similar_movie in similar_movies:
+            for field in array_fields:
+                if field in similar_movie:
+                    similar_movie[field] = process_array_field(similar_movie[field])
+                if field == 'Genres' and len(similar_movie[field]) > 30:
+                    # Truncate genres if too long
+                    genres = similar_movie[field].split(', ')
+                    similar_movie[field] = ', '.join(genres[:2]) + '...'
+        
+        return render_template('movie_detail.html',
+                            movie=movie,
+                            similar_movies=similar_movies)
+    except (IndexError, KeyError):
+        return "Không tìm thấy phim", 404
+
+@app.route('/api/potential_users/<movieid>')
+def get_potential_users(movieid):
+    try:  
+        mask = ratings_df['MovieID'].eq(movieid)
+        user_ratings = ratings_df.loc[mask]
+        
+        if user_ratings.empty:
+            username_idx_set = None
+        else:    
+            usernames_set = set(user_ratings['Username'])
+            username_idx_set = {user_data['user_index_by_username'].get(username, 0) for username in usernames_set}
+        print(f"Username indices to exclude: {username_idx_set}")
+
+
+        print("debug 1")
+        potential_users = model.find_potential_users(
+            movie_id=movieid,
+            movie_features=movie_features_list,
+            user_features=user_features_list,
+            username_by_index=username_by_index,
+            movie_index_by_id=movie_data['movie_index_by_id'],
+            k=10,
+            exclude_user_indices=username_idx_set,
+        )
+        print("debug 2")
+        
+        # Chuyển đổi điểm số sang thang 1-10
+        potential_users = [
+            (username, round(min(max(rating, 1.0), 10.0), 2))
+            for username, rating in potential_users
+        ]
+        
+        return jsonify(potential_users)
+    except Exception as e:
+        print(f"Error in get_potential_users: {e}")
+        
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

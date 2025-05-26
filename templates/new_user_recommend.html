@@ -3,67 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <title>Gợi ý phim cho người mới</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .autocomplete-container {
+            position: relative;
+        }
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #d4d4d4;
+        }
+        .autocomplete-items div:hover {
+            background-color: #e9e9e9;
+        }
+        .autocomplete-active {
+            background-color: #0d6efd !important;
+            color: #ffffff;
+        }
+    </style>
 </head>
-<body>
-<div class="container mt-5">
-    <h2 class="mb-4">Gợi ý phim cho người dùng mới</h2>
-    <form method="POST" class="row g-3 mb-4">
-        <div class="col-md-6">
-            <label for="username" class="form-label">Tên người dùng</label>
-            <input type="text" class="form-control" id="username" name="username" required value="{{ user_info.username }}">
-        </div>
-        <div class="col-md-6">
-            <label for="gender" class="form-label">Giới tính</label>
-            <select class="form-select" id="gender" name="gender" required>
-                {% for value, label in gender_choices %}
-                    <option value="{{ value }}" {% if user_info.gender == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-6">
-            <label for="age" class="form-label">Độ tuổi</label>
-            <select class="form-select" id="age" name="age" required>
-                {% for value, label in age_choices %}
-                    <option value="{{ value }}" {% if user_info.age == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-6">
-            <label for="occupation" class="form-label">Nghề nghiệp</label>
-            <select class="form-select" id="occupation" name="occupation" required>
-                {% for value, label in occupation_choices %}
-                    <option value="{{ value }}" {% if user_info.occupation == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-12">
-            <button type="submit" class="btn btn-primary">Gợi ý phim</button>
-        </div>
-    </form>
+<body style="background: linear-gradient(to right, #fbc2eb, #a6c1ee);">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 p-3">
+        <div class="container-fluid position-relative">
+            <!-- Logo bên trái -->
+            <a class="navbar-brand text-warning fw-bold" href="/">Movie Recommender System</a>
 
-    {% if show_result %}
-        <h4 class="mt-4">Top phim gợi ý cho bạn:</h4>
-        <div class="row">
-            {% for movie in recommended_movies %}
-                <div class="col-md-4 mb-4">
-                    <div class="card h-100">
-                        <img src="{{ movie.image }}" class="card-img-top" alt="{{ movie.title }}" style="height: 300px; object-fit: cover;">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ movie.title }}</h5>
-                            <p class="card-text">
-                                <strong>Điểm dự đoán:</strong> {{ movie.predicted_rating }}<br>
-                                <strong>Điểm trung bình:</strong> {{ movie.rating }}<br>
-                                <strong>Năm:</strong> {{ movie.year }}<br>
-                                <strong>Lượt đánh giá:</strong> {{ movie.numrate }}<br>
-                                <strong>Thể loại:</strong> {{ movie.genres }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
+            <div class="d-flex ms-auto">
+                <ul class="navbar-nav flex-row gap-3 fw-bold">
+                    <li class="nav-item">
+                        <a class="nav-link px-3 rounded" href="/">Gợi ý phim</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 rounded" href="/predict">Dự đoán đánh giá</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 rounded" href="/movies">Duyệt phim</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle px-3 rounded" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-cog"></i> Tạo mới
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/new_user_recommend">User</a></li>
+                            <li><a class="dropdown-item" href="#">Movie</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
         </div>
-    {% endif %}
-</div>
+    </nav>    <div class="container">
+        <h1 class="fw-bold text-center mb-4" style="color: #4B0082;">THÊM NGƯỜI DÙNG MỚI</h1>
+        
+        <form method="POST" id="userForm" style="max-width: 600px; margin: auto; padding: 1rem; border-radius: 0.5rem; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);">
+            <div class="mb-3">
+                <label for="username" class="form-label fw-bold">Tên người dùng</label>
+                <input type="text" class="form-control" id="username" name="username" required value="{{ user_info.username }}"
+                    style="border: none; box-shadow: none; background: transparent; border-radius: 0.375rem;">
+            </div>
+            
+            <div class="mb-3">
+                <label for="gender" class="form-label fw-bold">Giới tính</label>
+                <select class="form-select" id="gender" name="gender" required
+                    style="border: none; box-shadow: none; background: transparent; border-radius: 0.375rem;">
+                    {% for value, label in gender_choices %}
+                        <option value="{{ value }}" {% if user_info.gender == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label for="age" class="form-label fw-bold">Độ tuổi</label>
+                <select class="form-select" id="age" name="age" required
+                    style="border: none; box-shadow: none; background: transparent; border-radius: 0.375rem;">
+                    {% for value, label in age_choices %}
+                        <option value="{{ value }}" {% if user_info.age == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label for="occupation" class="form-label fw-bold">Nghề nghiệp</label>
+                <select class="form-select" id="occupation" name="occupation" required
+                    style="border: none; box-shadow: none; background: transparent; border-radius: 0.375rem;">
+                    {% for value, label in occupation_choices %}
+                        <option value="{{ value }}" {% if user_info.occupation == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="text-center">
+                <button type="submit" class="btn"
+                    style="background-color: #fd7e14; color: white; border: none;">
+                    Thêm người dùng
+                </button>
+            </div>
+        </form>
+        
+              <div id="loading" class="text-center d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p>Đang tải gợi ý phim...</p>
+        </div>
+
+        {% if show_result %}
+            <div class="mb-5" style="padding: 1rem;">
+                <h2 class="mb-3 text-end" style="font-size: 1rem; color: #333;">
+                    Gợi ý cho người dùng mới
+                    <span class="text-primary fst-italic" style="font-size: 0.875rem;">
+                        "{{ user_info.username if user_info.username else '' }}"
+                    </span>
+                </h2>                <div class="row row-cols-1 row-cols-md-5 g-3">
+                    {% for movie in recommended_movies %}
+                    <div class="col">
+                        <a href="/movie/{{ movie['ID'] }}" style="text-decoration: none; color: inherit;">
+                            <div class="card h-100 text-center" style="border-radius: 0.75rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease; cursor: pointer;" 
+                                onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                <img src="{{ movie.image }}" class="card-img-top" alt="{{ movie.title }}" 
+                                    style="object-fit: contain; height: 200px; border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem;">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ movie.title }} <span class="badge bg-secondary">{{ movie.year }}</span></h5>
+                                    <p class="card-text">
+                                        <span class="badge bg-info" style="font-weight: 500;">
+                                            {{ movie.genres | replace("['", "") | replace("']", "") | replace("'", "") | truncate(30, True, '...') }}
+                                        </span><br>
+                                        <span class="badge bg-success mt-2">Điểm dự đoán: {{ movie.predicted_rating }} ⭐</span><br>
+                                        <small class="text-muted">
+                                            Điểm TB: {{ movie.rating }} ⭐ ({{ movie.numrate }} đánh giá)
+                                        </small>
+                                    </p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('userForm');
+            const loadingIndicator = document.getElementById('loading');
+            
+            form.addEventListener('submit', function(e) {
+                loadingIndicator.classList.remove('d-none');
+            });
+        });
+    </script>
 </body>
 </html>

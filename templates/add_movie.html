@@ -3,50 +3,293 @@
 <head>
     <meta charset="UTF-8">
     <title>Thêm phim mới</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .autocomplete-container {
+            position: relative;
+        }
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #d4d4d4;
+        }
+        .autocomplete-items div:hover {
+            background-color: #e9e9e9;
+        }
+        .autocomplete-active {
+            background-color: #0d6efd !important;
+            color: #ffffff;
+        }
+    </style>
 </head>
-<body class="bg-light">
-<div class="container py-4">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="/">🍿 Movie Recommender System</a>
+<body style="background: linear-gradient(to right, #fbc2eb, #a6c1ee);">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 p-3">
+        <div class="container-fluid position-relative">
+            <a class="navbar-brand text-warning fw-bold" href="/">Movie Recommender System</a>
+            <div class="d-flex ms-auto">
+                <ul class="navbar-nav flex-row gap-3 fw-bold">
+                    <li class="nav-item">
+                        <a class="nav-link px-3 rounded" href="/">Gợi ý phim</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 rounded" href="/predict">Dự đoán đánh giá</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 rounded" href="/movies">Duyệt phim</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle px-3 rounded" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-cog"></i> Tạo mới
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/new_user_recommend">User</a></li>
+                            <li><a class="dropdown-item" href="/add_movie">Movie</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
         </div>
     </nav>
-    <h2 class="mb-4">Thêm phim mới</h2>
-    {% if message %}
-        <div class="alert alert-success">{{ message }}</div>
-    {% endif %}
-    <form method="POST" class="card p-4 shadow-sm mb-4">
-        <div class="row g-3">
-            {% for key, label in {'ID':'ID', 'Title':'Tên phim', 'Year':'Năm', 'Genres':'Thể loại', 'Image':'Ảnh', 'Numrate':'Số lượt đánh giá', 'Rating':'Điểm TB', 'Directors':'Đạo diễn', 'Writers':'Biên kịch', 'Stars':'Diễn viên', 'Runtime':'Thời lượng'}.items() %}
-            <div class="col-md-6">
-                <label class="form-label">{{ label }}</label>
-                <input type="text" class="form-control" name="{{ key }}" value="{{ movie_info[key] }}">
-            </div>
-            {% endfor %}
-        </div>
-        <button type="submit" class="btn btn-success mt-4">Thêm phim</button>
-    </form>
 
-    {% if predicted_users %}
-    <h4 class="mt-4">Top người dùng dự đoán sẽ cho điểm cao</h4>
-    <table class="table table-bordered table-striped">
-        <thead class="table-light">
-            <tr>
-                <th>Username</th>
-                <th>Predicted Score</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for username, score in predicted_users %}
-            <tr>
-                <td>{{ username }}</td>
-                <td>{{ '%.2f'|format(score) }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
-</div>
+    <div class="container">
+        <h1 class="fw-bold text-center mb-4" style="color: #4B0082;">THÊM PHIM MỚI</h1>
+        {% if message %}
+            <div class="alert alert-success">{{ message }}</div>
+        {% endif %}
+        
+        <div class="card shadow p-4 mb-4" style="border-radius: 1rem; background: rgba(255, 255, 255, 0.9);">
+            <form method="POST" class="needs-validation" novalidate>
+                <div class="row g-3">
+                    <!-- Basic Info -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">ID Phim</label>
+                        <input type="text" class="form-control" name="ID" value="{{ movie_info['ID'] }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Tên phim</label>
+                        <input type="text" class="form-control" name="Title" value="{{ movie_info['Title'] }}" required>
+                    </div>
+                    
+                    <!-- Year Input -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Năm</label>
+                        <input type="number" class="form-control" name="Year" 
+                               value="{{ movie_info['Year'] }}" required 
+                               min="2000" max="2024" step="1"
+                               placeholder="Nhập năm (2000-2024)">
+                    </div>
+
+                    <!-- Runtime Input -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Thời lượng (phút)</label>
+                        <input type="number" class="form-control" name="Runtime" 
+                               value="{{ movie_info['Runtime'] }}" required
+                               min="1" step="1" 
+                               placeholder="Nhập thời lượng phim (phút)">
+                    </div>
+
+                    <!-- Genres with Autocomplete -->
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Thể loại</label>
+                        <div class="autocomplete-container">
+                            <input type="text" class="form-control" id="genres_input" placeholder="Nhập thể loại..."
+                                   autocomplete="off" data-field="genres">
+                            <input type="hidden" name="Genres" id="genres_value" value="{{ movie_info['Genres'] }}">
+                            <div class="autocomplete-items" id="genres-autocomplete-list"></div>
+                        </div>
+                        <div id="genres-tags" class="mt-2"></div>
+                    </div>
+
+                    <!-- Directors with Autocomplete -->
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Đạo diễn</label>
+                        <div class="autocomplete-container">
+                            <input type="text" class="form-control" id="directors_input" placeholder="Nhập tên đạo diễn..."
+                                   autocomplete="off" data-field="directors">
+                            <input type="hidden" name="Directors" id="directors_value" value="{{ movie_info['Directors'] }}">
+                            <div class="autocomplete-items" id="directors-autocomplete-list"></div>
+                        </div>
+                        <div id="directors-tags" class="mt-2"></div>
+                    </div>
+
+                    <!-- Writers with Autocomplete -->
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Biên kịch</label>
+                        <div class="autocomplete-container">
+                            <input type="text" class="form-control" id="writers_input" placeholder="Nhập tên biên kịch..."
+                                   autocomplete="off" data-field="writers">
+                            <input type="hidden" name="Writers" id="writers_value" value="{{ movie_info['Writers'] }}">
+                            <div class="autocomplete-items" id="writers-autocomplete-list"></div>
+                        </div>
+                        <div id="writers-tags" class="mt-2"></div>
+                    </div>
+
+                    <!-- Stars with Autocomplete -->
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Diễn viên</label>
+                        <div class="autocomplete-container">
+                            <input type="text" class="form-control" id="stars_input" placeholder="Nhập tên diễn viên..."
+                                   autocomplete="off" data-field="stars">
+                            <input type="hidden" name="Stars" id="stars_value" value="{{ movie_info['Stars'] }}">
+                            <div class="autocomplete-items" id="stars-autocomplete-list"></div>
+                        </div>
+                        <div id="stars-tags" class="mt-2"></div>
+                    </div>
+
+                    <!-- Image URL -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold">URL Ảnh</label>
+                        <input type="url" class="form-control" name="Image" value="{{ movie_info['Image'] }}">
+                    </div>
+
+                    <!-- Hidden fields for Numrate and Rating -->
+                    <input type="hidden" name="Numrate" value="0">
+                    <input type="hidden" name="Rating" value="0">
+                </div>
+                
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-success px-4 py-2">Thêm phim</button>
+                </div>
+            </form>
+        </div>
+
+        {% if predicted_users %}
+        <div class="card shadow p-4 mt-4" style="border-radius: 1rem; background: rgba(255, 255, 255, 0.9);">
+            <h4 class="mb-3">Người dùng có khả năng đánh giá cao</h4>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Username</th>
+                            <th>Điểm dự đoán</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for username, score in predicted_users %}
+                        <tr>
+                            <td>{{ username }}</td>
+                            <td>{{ '%.2f'|format(score) }} ⭐</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize all autocomplete fields
+            const autocompleteFields = ['genres', 'directors', 'writers', 'stars'];
+            const selectedValues = {
+                genres: new Set(),
+                directors: new Set(),
+                writers: new Set(),
+                stars: new Set()
+            };
+
+            function createTag(value, field) {
+                const tag = document.createElement('span');
+                tag.className = 'badge bg-primary me-2 mb-2';
+                tag.innerHTML = `${value} <button type="button" class="btn-close btn-close-white" aria-label="Close"></button>`;
+                tag.querySelector('button').addEventListener('click', () => {
+                    selectedValues[field].delete(value);
+                    updateHiddenField(field);
+                    tag.remove();
+                });
+                return tag;
+            }
+
+            function updateHiddenField(field) {
+                const hiddenField = document.getElementById(`${field}_value`);
+                hiddenField.value = Array.from(selectedValues[field]).join(', ');
+            }
+
+            function setupAutocomplete(field) {
+                const input = document.getElementById(`${field}_input`);
+                const autoCompleteList = document.getElementById(`${field}-autocomplete-list`);
+                const tagsContainer = document.getElementById(`${field}-tags`);
+                let debounceTimer;
+
+                // Initialize tags from existing values
+                const existingValues = document.getElementById(`${field}_value`).value;
+                if (existingValues) {
+                    existingValues.split(', ').forEach(value => {
+                        if (value) {
+                            selectedValues[field].add(value);
+                            tagsContainer.appendChild(createTag(value, field));
+                        }
+                    });
+                }
+
+                input.addEventListener('input', function() {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        if (input.value.length < 2) {
+                            autoCompleteList.innerHTML = '';
+                            return;
+                        }
+
+                        fetch(`/api/search_movie_fields?field=${field}&query=${encodeURIComponent(input.value)}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                autoCompleteList.innerHTML = '';
+                                data.forEach(item => {
+                                    if (!selectedValues[field].has(item.name)) {
+                                        const div = document.createElement('div');
+                                        div.textContent = item.name;
+                                        div.addEventListener('click', function() {
+                                            selectedValues[field].add(item.name);
+                                            tagsContainer.appendChild(createTag(item.name, field));
+                                            updateHiddenField(field);
+                                            input.value = '';
+                                            autoCompleteList.innerHTML = '';
+                                        });
+                                        autoCompleteList.appendChild(div);
+                                    }
+                                });
+                            });
+                    }, 300);
+                });
+
+                // Close autocomplete list when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (e.target !== input) {
+                        autoCompleteList.innerHTML = '';
+                    }
+                });
+            }
+
+            // Setup autocomplete for all fields
+            autocompleteFields.forEach(setupAutocomplete);
+
+            // Form validation
+            const form = document.querySelector('form');
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            });
+        });
+    </script>
 </body>
 </html>

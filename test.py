@@ -15,6 +15,7 @@ weight_decay = data["weight_decay"]
 dropout_rate = data["dropout_rate"]
 
 movie_features = data["movie_features"]
+user_features = data["user_features"]
 user_index_by_username = data["user_index_by_username"]
 movie_index_by_id = data["movie_index_by_id"]
 movie_id_by_index = {v: k for k, v in movie_index_by_id.items()}
@@ -43,7 +44,8 @@ with torch.no_grad():
         movie_id=movie_id,
         user_index_by_username=user_index_by_username,
         movie_index_by_id=movie_index_by_id,
-        movie_features=movie_features
+        movie_features=movie_features,
+        user_features=user_features
     )
     print(f"⭐ Dự đoán rating của {username} cho phim {movie_id}: {prediction:.4f}")
 
