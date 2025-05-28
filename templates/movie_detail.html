@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body style="background: linear-gradient(to right, #fbc2eb, #a6c1ee);">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 p-3">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 p-3" >
         <div class="container-fluid position-relative">
             <!-- Logo bên trái -->
             <a class="navbar-brand text-warning fw-bold" href="/">Movie Recommender System</a>
@@ -31,7 +31,7 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="/new_user_recommend">User</a></li>
-                            <li><a class="dropdown-item" href="#">Movie</a></li>
+                            <li><a class="dropdown-item" href="/add_movie">Movie</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -43,7 +43,7 @@
         <div class="row">
             <!-- Phần chi tiết phim bên trái -->
             <div class="col-md-8">
-                <div class="card h-80">
+                <div class="card h-80" style="background: linear-gradient(to right, rgb(245, 236, 249), rgb(237, 246, 255))">
                     <div class="row g-0">
                         <div class="col-md-4 p-3">
                             <img src="{{ movie.Image }}" class="img-fluid rounded" alt="{{ movie.Title }}"
@@ -70,11 +70,13 @@
                             </div>
                         </div>
                     </div>
-                </div>                <!-- Danh sách người dùng tiềm năng -->
-                <div class="card mt-4">
+                </div>               
+                 <!-- Danh sách người dùng tiềm năng -->
+                <div class="card mt-4" style="background: linear-gradient(to right,rgb(245, 236, 249),rgb(237, 246, 255)">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Người dùng có thể thích phim này</h5>
-                        <button id="loadPotentialUsers" class="btn btn-primary" data-movie-id="{{ movie.ID }}">
+                        <button id="loadPotentialUsers" class="btn" style ="white-space: nowrap; background-color: #fd7e14; color: white; border: none;"
+                         data-movie-id="{{ movie.ID }}">
                             Tìm kiếm người dùng tiềm năng
                         </button>
                     </div>
@@ -134,14 +136,14 @@
             </div>           
              <!-- Phim tương tự bên phải -->
             <div class="col-md-4">
-                <div class="card">
+                <div class="card" style="background: linear-gradient(to right, rgb(236, 249, 248), rgb(237, 246, 255))">
                     <div class="card-header">
                         <h5 class="mb-0">Phim tương tự</h5>
                     </div>
                     <div class="card-body" style="max-height: 550px; overflow-y: auto;">
                         {% for movie in similar_movies %}
                             <a href="/movie/{{ movie['ID'] }}" class="text-decoration-none">
-                                <div class="card mb-3" style="transition: transform 0.3s ease;" 
+                                <div class="card mb-3" style="transition: transform 0.3s ease; background: linear-gradient(to right,rgb(245, 236, 249),rgb(237, 246, 255)" 
                                     onmouseover="this.style.transform='scale(1.02)'" 
                                     onmouseout="this.style.transform='scale(1)'">
                                     <div class="row g-0">

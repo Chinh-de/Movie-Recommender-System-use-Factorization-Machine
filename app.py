@@ -1,14 +1,20 @@
 import torch
 import pickle
 import pandas as pd
-import requests
 from flask import Flask, render_template, request, jsonify, url_for
 from Model.FactorizationMachine import FactorizationMachine
+from Model.ContentBased_Support import get_similar_movies, combine_features, add_new_movie
 import time
-import requests
+from flask import redirect
 # Load supporting data
 with open("Model/support_data.pkl", "rb") as f:
     data = pickle.load(f)
+with open('Model/vectorizer.pkl', 'rb') as f:
+    vectorizer = pickle.load(f)
+with open('Model/tfidf_matrix.pkl', 'rb') as f:
+    tfidf_matrix = pickle.load(f)
+with open('Model/cosine_sim.pkl', 'rb') as f:
+    cosine_sim = pickle.load(f)
 
 # Model parameters
 num_inputs = data["num_inputs"]
@@ -65,6 +71,9 @@ model.eval()
 ratings_df = pd.read_csv('data/ratings.csv')
 movies_df = pd.read_csv('data/movies.csv')
 users_df = pd.read_csv('data/users.csv')
+movie_indices = pd.Series(movies_df.index, index=movies_df['ID']).drop_duplicates()
+movie_ids_list = movies_df['ID'].tolist()
+
 
 app = Flask(__name__) 
 
@@ -434,7 +443,7 @@ def search_movie_fields():
 
 @app.route('/add_movie', methods=['GET', 'POST'])
 def add_movie():
-    global movie_features_list, user_features_list, movies_df, ratings_df, movie_data, user_data, model, movie_id_by_index, username_by_index
+    global movie_features_list, user_features_list, movies_df, movie_data, movie_id_by_index, vectorizer, tfidf_matrix, cosine_sim, movies_df, movie_indices, movie_ids_list
     message = None
     predicted_users = []
     movie_info = {
@@ -531,31 +540,12 @@ def add_movie():
             movie_features_list.append(movie_features)            
 
             new_row = pd.DataFrame([movie_info])
-            global movies_df
-            movies_df = pd.concat([movies_df, new_row], ignore_index=True)
-            message = f"Đã thêm phim '{movie_info['Title']}' thành công!"
+            new_row['combined_features'] = new_row.apply(combine_features, axis=1)
 
-
-            # Predict ratings for all users
-            top_users = []
-            for username in ratings_df['Username'].unique():
-                user_index = user_data['user_index_by_username'].get(username)
-                if user_index is None:
-                    continue
-                    
-                with torch.no_grad():
-                    predicted_rating = model.predict_rating(
-                        username=username,
-                        movie_id=movie_info['ID'],
-                        user_index_by_username=user_data['user_index_by_username'],
-                        movie_index_by_id=movie_data['movie_index_by_id'],
-                        movie_features=movie_features_list,
-                        user_features=user_features_list
-                    )
-                    top_users.append((username, predicted_rating))
-                    
-            predicted_users = sorted(top_users, key=lambda x: x[1], reverse=True)[:10]
-            
+            vectorizer, tfidf_matrix, cosine_sim, movies_df, movie_indices = add_new_movie(new_row, vectorizer, tfidf_matrix, cosine_sim, movies_df, movie_indices)
+            print(f"Added new movie: {new_row}")
+            movie_ids_list.append(movie_info['ID'])
+            return redirect(url_for('movie_detail', movieid=movie_info['ID']))
         except Exception as e:
             message = f"Lỗi khi thêm phim: {str(e)}"
             print(f"Error while adding movie: {e}")
@@ -579,7 +569,11 @@ def process_array_field(field_value):
 @app.route('/movie/<movieid>')
 def movie_detail(movieid):
     try:
-        movie = movies_df[movies_df['ID'] == movieid].iloc[0].to_dict()
+        movie_row = movies_df[movies_df['ID'] == movieid]
+        if movie_row.empty:
+            return "Không tìm thấy phim", 404
+            
+        movie = movie_row.iloc[0].to_dict()
 
         # Process array fields
         array_fields = ['Directors', 'Writers', 'Stars', 'Genres']
@@ -588,16 +582,23 @@ def movie_detail(movieid):
                 movie[field] = process_array_field(movie[field])
 
 
-        similar_movies = movies_df.head(10).to_dict('records')
-        for similar_movie in similar_movies:
+        similar_movie_ids = get_similar_movies(
+            movie_id=movieid,
+            cosine_sim=cosine_sim,
+            movie_ids_list=movie_ids_list,
+            movie_indices=movie_indices,
+            top_n=10
+        )
+        similar_movies = []
+        for m_id in similar_movie_ids:
+            similar_movie = movies_df[movies_df['ID'] == m_id].iloc[0].to_dict()
             for field in array_fields:
                 if field in similar_movie:
                     similar_movie[field] = process_array_field(similar_movie[field])
                 if field == 'Genres' and len(similar_movie[field]) > 30:
-                    # Truncate genres if too long
                     genres = similar_movie[field].split(', ')
                     similar_movie[field] = ', '.join(genres[:2]) + '...'
-        
+            similar_movies.append(similar_movie)
         return render_template('movie_detail.html',
                             movie=movie,
                             similar_movies=similar_movies)
@@ -615,10 +616,8 @@ def get_potential_users(movieid):
         else:    
             usernames_set = set(user_ratings['Username'])
             username_idx_set = {user_data['user_index_by_username'].get(username, 0) for username in usernames_set}
-        print(f"Username indices to exclude: {username_idx_set}")
 
 
-        print("debug 1")
         potential_users = model.find_potential_users(
             movie_id=movieid,
             movie_features=movie_features_list,
@@ -628,7 +627,6 @@ def get_potential_users(movieid):
             k=10,
             exclude_user_indices=username_idx_set,
         )
-        print("debug 2")
         
         # Chuyển đổi điểm số sang thang 1-10
         potential_users = [
@@ -641,6 +639,9 @@ def get_potential_users(movieid):
         print(f"Error in get_potential_users: {e}")
         
         return jsonify({"error": str(e)}), 500
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)

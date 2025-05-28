@@ -64,7 +64,7 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><a class="dropdown-item" href="/new_user_recommend">User</a></li>
-                    <li><a class="dropdown-item" href="#">Movie</a></li>
+                    <li><a class="dropdown-item" href="/add_movie">Movie</a></li>
                 </ul>
                 </li>
             </ul>
@@ -85,7 +85,7 @@
                 class="form-control flex-grow-1 text-black"
                 placeholder="Nhập ít nhất 2 ký tự trong username..."
                 autocomplete="off"
-                style="border: none; box-shadow: none; background: transparent; color: white; border-radius: 0.375rem;"
+                style="border: none; box-shadow: none; background: transparent; color: white; border-radius: 0; border-bottom: 2px solid #4B0082;"
                 >
                 <button 
                 type="submit" 
@@ -121,7 +121,7 @@
                 {% for movie in recommended_movies %}
                 <div class="col">
                     <a href="/movie/{{ movie['ID'] }}" style="text-decoration: none; color: inherit;">
-                        <div class="card h-100 text-center" style="border-radius: 0.75rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease; cursor: pointer;" 
+                        <div class="card h-100 text-center" style="border-radius: 0.75rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease; cursor: pointer; background: linear-gradient(to right,rgb(245, 236, 249),rgb(237, 246, 255)" 
                             onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                             <img src="{{ movie['image'] }}" class="card-img-top" alt="{{ movie['title'] }}" 
                                 style="object-fit: contain; height: 200px; border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem;">

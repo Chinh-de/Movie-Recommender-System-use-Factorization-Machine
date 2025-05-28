@@ -73,54 +73,52 @@
             <div class="alert alert-success">{{ message }}</div>
         {% endif %}
         
-        <div class="card shadow p-4 mb-4" style="border-radius: 1rem; background: rgba(255, 255, 255, 0.9);">
-            <form method="POST" class="needs-validation" novalidate>
+        <div class="card shadow p-4 mb-4 w-50 mx-auto " style="border-radius: 1rem; background: linear-gradient(to right, #f0f0f0, #d4eaff);">
+            <form method="POST" class="needs-validation" novalidate>                
                 <div class="row g-3">
+                    <!-- Hidden Movie ID field -->
+                    <input type="hidden" name="ID" id="movie_id" value="{{ movie_info['ID'] }}">
+                    
                     <!-- Basic Info -->
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">ID Phim</label>
-                        <input type="text" class="form-control" name="ID" value="{{ movie_info['ID'] }}" required>
-                    </div>
-                    <div class="col-md-6">
+                    <div class="col-12">
                         <label class="form-label fw-bold">Tên phim</label>
-                        <input type="text" class="form-control" name="Title" value="{{ movie_info['Title'] }}" required>
+                        <input type="text" class="form-control bg-transparent rounded-4 border-2" name="Title" 
+                               value="{{ movie_info['Title'] }}" required
+                               placeholder="Nhập tên phim...">
                     </div>
                     
-                    <!-- Year Input -->
+                    <!-- Movie Info Row -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Năm</label>
-                        <input type="number" class="form-control" name="Year" 
+                        <input type="number" class="form-control bg-transparent rounded-4 border-2" name="Year" 
                                value="{{ movie_info['Year'] }}" required 
-                               min="2000" max="2024" step="1"
-                               placeholder="Nhập năm (2000-2024)">
+                               min="1600" max="9999" step="1"
+                               placeholder="Năm phát hành...">
                     </div>
 
-                    <!-- Runtime Input -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Thời lượng (phút)</label>
-                        <input type="number" class="form-control" name="Runtime" 
+                        <input type="number" class="form-control bg-transparent rounded-4 border-2" name="Runtime" 
                                value="{{ movie_info['Runtime'] }}" required
                                min="1" step="1" 
-                               placeholder="Nhập thời lượng phim (phút)">
+                               placeholder="Thời lượng...">
                     </div>
 
-                    <!-- Genres with Autocomplete -->
-                    <div class="col-md-12">
+                    <!-- Genres and Directors in one row -->
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Thể loại</label>
                         <div class="autocomplete-container">
-                            <input type="text" class="form-control" id="genres_input" placeholder="Nhập thể loại..."
+                            <input type="text" class="form-control bg-transparent rounded-4 border-2" id="genres_input" placeholder="Nhập thể loại..."
                                    autocomplete="off" data-field="genres">
                             <input type="hidden" name="Genres" id="genres_value" value="{{ movie_info['Genres'] }}">
                             <div class="autocomplete-items" id="genres-autocomplete-list"></div>
                         </div>
                         <div id="genres-tags" class="mt-2"></div>
                     </div>
-
-                    <!-- Directors with Autocomplete -->
-                    <div class="col-md-12">
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Đạo diễn</label>
                         <div class="autocomplete-container">
-                            <input type="text" class="form-control" id="directors_input" placeholder="Nhập tên đạo diễn..."
+                            <input type="text" class="form-control bg-transparent rounded-4 border-2" id="directors_input" placeholder="Nhập tên đạo diễn..."
                                    autocomplete="off" data-field="directors">
                             <input type="hidden" name="Directors" id="directors_value" value="{{ movie_info['Directors'] }}">
                             <div class="autocomplete-items" id="directors-autocomplete-list"></div>
@@ -128,23 +126,21 @@
                         <div id="directors-tags" class="mt-2"></div>
                     </div>
 
-                    <!-- Writers with Autocomplete -->
-                    <div class="col-md-12">
+                    <!-- Writers and Stars in one row -->
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Biên kịch</label>
                         <div class="autocomplete-container">
-                            <input type="text" class="form-control" id="writers_input" placeholder="Nhập tên biên kịch..."
+                            <input type="text" class="form-control bg-transparent rounded-4 border-2" id="writers_input" placeholder="Nhập tên biên kịch..."
                                    autocomplete="off" data-field="writers">
                             <input type="hidden" name="Writers" id="writers_value" value="{{ movie_info['Writers'] }}">
                             <div class="autocomplete-items" id="writers-autocomplete-list"></div>
                         </div>
                         <div id="writers-tags" class="mt-2"></div>
                     </div>
-
-                    <!-- Stars with Autocomplete -->
-                    <div class="col-md-12">
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Diễn viên</label>
                         <div class="autocomplete-container">
-                            <input type="text" class="form-control" id="stars_input" placeholder="Nhập tên diễn viên..."
+                            <input type="text" class="form-control bg-transparent rounded-4 border-2" id="stars_input" placeholder="Nhập tên diễn viên..."
                                    autocomplete="off" data-field="stars">
                             <input type="hidden" name="Stars" id="stars_value" value="{{ movie_info['Stars'] }}">
                             <div class="autocomplete-items" id="stars-autocomplete-list"></div>
@@ -155,7 +151,7 @@
                     <!-- Image URL -->
                     <div class="col-12">
                         <label class="form-label fw-bold">URL Ảnh</label>
-                        <input type="url" class="form-control" name="Image" value="{{ movie_info['Image'] }}">
+                        <input type="url" class="form-control bg-transparent rounded-4 border-2" name="Image" value="{{ movie_info['Image'] }}">
                     </div>
 
                     <!-- Hidden fields for Numrate and Rating -->
@@ -164,38 +160,27 @@
                 </div>
                 
                 <div class="text-center mt-4">
-                    <button type="submit" class="btn btn-success px-4 py-2">Thêm phim</button>
+                    <button type="submit" class="btn px-4 py-2" style="white-space: nowrap; background-color: #fd7e14; color: white; border: none;">Thêm phim</button>
                 </div>
             </form>
         </div>
 
-        {% if predicted_users %}
-        <div class="card shadow p-4 mt-4" style="border-radius: 1rem; background: rgba(255, 255, 255, 0.9);">
-            <h4 class="mb-3">Người dùng có khả năng đánh giá cao</h4>
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Username</th>
-                            <th>Điểm dự đoán</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for username, score in predicted_users %}
-                        <tr>
-                            <td>{{ username }}</td>
-                            <td>{{ '%.2f'|format(score) }} ⭐</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
+
     </div>
 
     <script>
+        function generateMovieId() {
+            const random = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+            return `mid_${random}`;
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Set random movie ID if not already set
+            const movieIdField = document.getElementById('movie_id');
+            if (!movieIdField.value) {
+                movieIdField.value = generateMovieId();
+            }
+
             // Initialize all autocomplete fields
             const autocompleteFields = ['genres', 'directors', 'writers', 'stars'];
             const selectedValues = {
