@@ -1,9 +1,9 @@
 # Bỏ qua thư mục môi trường ảo
 
 # Bỏ qua các file model
-.pkl
-.pt
-.csv
+*.pkl
+*.pt
+*.csv
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
